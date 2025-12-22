@@ -1,0 +1,95 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+//reset dev database:
+//https://www.prisma.io/docs/orm/prisma-migrate/workflows/development-and-production#reset-the-development-database
+//the server has to be disconnected!
+
+//A Prisma Schema file contains the following: Generator, Datasource and the data model!
+//A) Generator: defines which client should be generated based on the data model
+//when running prisma generate command. 
+//Eg: Prisma Client is generated in node_modules/prisma/client folder
+//and it contains all the commands to query the models from th db!
+//Once it's generated, we can use the PrismaClient class in our backend
+generator client {
+  provider = "prisma-client-js"
+}
+
+//B) defines connection to the db: [run npx prisma generate when changing url!]
+datasource db {
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")  
+}
+
+//C) Data model:
+model Questionnaires {
+  questionId  Float    @unique
+  title       String
+  choices     String[]
+  chartType   Chart    @default(undefined)
+  campaign    String   @default("")
+  sectionName String   @default("")
+
+  //relations (to another model):
+  answers Answers[]
+}
+
+enum Chart {
+  bar
+  pie
+  table
+  undefined
+}
+
+model Answers {
+  id Int @id @default(autoincrement())
+
+  questionTitle String
+  userAnswer    String?
+  userEmail     String
+
+  assigAuditor String?
+  auditorNote  String?
+  hashtags     String?
+  stateLabels  String?
+  verifStatus  String?
+
+  //relations (to another model) by using the @relation attribute:
+  questionnaire Questionnaires @relation(fields: [questionId], references: [questionId])
+  questionId   Float //foreign key in database
+
+  user   Users @relation(fields: [userId], references: [userId])
+  userId Float
+
+  //unique blocks | multi-field unique (column does not appear in table, but you can use this field even to query an item, cool!)
+  @@unique(fields: [questionId, userId], name: "questionId_userId") //this combination has to be unique, we can use name to later query from prismaClient where:{...}
+}
+
+model Users {
+  userId          Float   @unique //since those are big integers, use float to not be limited in size!
+  userEmail       String
+  userName        String
+  userLabels      String?
+  country         String
+  academicProgramme String[] //it returns null sometimes, make it @default("")??
+
+  //relations (to another model):
+  answers Answers[]
+}
+
+//commands:
+//prisma format | it formats the prisma file, really cool!
+//prisma migrate dev --name init | it uses the prisma schema to modify/create the database schema in PGadmin, etc...
+//so we call this every time we finished updating the prisma schema file to keep the database schema synchronized with the updates.
+//it also calls the prisma generate command (if you've installed @prisma/client package)
+//at the end to generate the prisma client ORM that enables to query the db
+//prisma db push | It also syncs the prisma schema with the database schema
+//with except that it does not generate a migration. Convenient to be used with mongoDB to evolve the database schema
+
+//In production:
+//prisma migrate deploy | it syncs migration history from dev env with database in prod env.
+//It should be run in an automated CI/CD environment (eg. github actions)
+//if there is no migration folder [mongoDB setup], keep using prisma db push
